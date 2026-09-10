@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>¡Gracias por tu compra! — Sorteos</title>
+<link rel="stylesheet" href="estilos.css">
+<style>
+  .msg-box{max-width:520px;margin:80px auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:36px;text-align:center}
+  .msg-box h1{color:var(--yellow);font-size:26px;margin:0 0 12px}
+  .msg-box p{color:var(--muted);font-size:14px;line-height:1.6}
+  .msg-box a{display:inline-block;margin-top:18px;background:var(--yellow);color:#050505;font-weight:900;border-radius:9px;padding:12px 20px}
+  #numeros{color:var(--text);font-weight:800;margin-top:14px}
+</style>
+</head>
+<body>
+  <div class="msg-box">
+    <h1>🎉 ¡Pago recibido!</h1>
+    <p>Estamos confirmando tu pago con Mercado Pago, puede tardar unos segundos.</p>
+    <p id="numeros">Consultando tu(s) número(s) de boleto...</p>
+    <a href="/">Volver al inicio</a>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const externalReference = params.get('external_reference');
+
+    async function consultar() {
+      if (!externalReference) {
+        document.getElementById('numeros').textContent = 'Revisa tu correo para la confirmación.';
+        return;
+      }
+      try {
+        const r = await fetch('/api/compra/' + externalReference);
+        const data = await r.json();
+        if (data.estado === 'aprobado') {
+          document.getElementById('numeros').textContent =
+            'Tus boletos: #' + data.numerosAsignados.join(', #');
+        } else {
+          document.getElementById('numeros').textContent =
+            'Tu pago sigue en proceso, en unos segundos aparecerá confirmado.';
+          setTimeout(consultar, 3000);
+        }
+      } catch (e) {
+        document.getElementById('numeros').textContent = 'Revisa tu correo para la confirmación.';
+      }
+    }
+    consultar();
+  </script>
+</body>
+</html>
