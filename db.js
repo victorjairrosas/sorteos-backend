@@ -8,8 +8,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const COMPRAS_PATH = path.join(__dirname, 'data', 'compras.json');
-const RIFA_PATH = path.join(__dirname, 'data', 'rifa-config.json');
+   const COMPRAS_PATH = path.join(__dirname, 'compras.json');
+   const RIFA_PATH = path.join(__dirname, 'rifa-config.json');
 
 function getRifaConfig() {
   return JSON.parse(fs.readFileSync(RIFA_PATH, 'utf-8'));
