@@ -14,7 +14,7 @@ const db = require('./db');
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public')); // sirve index.html, estilos.css, etc.
+   app.use(express.static(__dirname)); // sirve index.html, estilos.css, etc.
 
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
