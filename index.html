@@ -6,14 +6,37 @@
 <title>Sorteos — Tus sueños, más cerca</title>
 <link rel="stylesheet" href="estilos.css">
 <style>
-  /* Estilos del modal de compra (nuevo) */
-  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center}
+  /* ── Selector de boletos por número ── */
+  .picker-toolbar{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+  .picker-toolbar input, .picker-toolbar select{background:#0b0f13;border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 10px;font-size:12px}
+  .picker-toolbar input{flex:1;min-width:140px}
+  .quick-pick{display:flex;gap:8px}
+  .quick-pick button{background:#1c242b;color:#fff;border:0;border-radius:8px;padding:9px 12px;font-size:11px;cursor:pointer;font-weight:700}
+  .quick-pick button:hover{background:#262f38}
+  .leyenda{display:flex;gap:16px;font-size:10px;color:var(--muted);margin-bottom:14px;flex-wrap:wrap}
+  .leyenda span{display:inline-flex;align-items:center;gap:5px}
+  .leyenda i{width:10px;height:10px;border-radius:3px;display:inline-block}
+  .boletos-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:8px;margin-bottom:90px}
+  .boleto{aspect-ratio:1;border-radius:8px;border:1px solid var(--line);background:#0d1217;color:var(--muted);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .boleto:hover:not(:disabled){border-color:var(--yellow)}
+  .boleto.vendido{background:#1c242b;color:#4a545c;cursor:not-allowed;text-decoration:line-through;border-color:#1c242b}
+  .boleto.reservado{background:#2b2413;color:#8a7a3c;cursor:not-allowed;border-color:#2b2413}
+  .boleto.seleccionado{background:var(--yellow);color:#050505;border-color:var(--yellow)}
+  .boleto.resaltado{outline:2px solid #fff;outline-offset:1px}
+  .picker-bar{position:sticky;bottom:14px;display:flex;align-items:center;justify-content:space-between;background:#0b1015;border:1px solid var(--line);border-radius:12px;padding:14px 18px;gap:14px;flex-wrap:wrap;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+  .picker-bar b{color:var(--yellow)}
+  .picker-bar button{background:var(--yellow);color:#050505;border:0;border-radius:9px;padding:10px 18px;font-weight:900;cursor:pointer}
+  .picker-bar button:disabled{opacity:.4;cursor:not-allowed}
+
+  /* ── Modal de compra ── */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center;padding:16px}
   .modal-overlay.abierto{display:flex}
-  .modal-box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px;width:min(380px,90%)}
+  .modal-box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:26px;width:min(420px,92%);max-height:90vh;overflow:auto}
   .modal-box h2{margin:0 0 4px;font-size:18px}
   .modal-box p{color:var(--muted);font-size:12px;margin:0 0 16px}
   .modal-box label{display:block;font-size:11px;font-weight:700;margin:12px 0 5px}
   .modal-box input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:#0b0f13;color:var(--text);font-size:13px}
+  .numeros-elegidos{display:flex;flex-wrap:wrap;gap:6px;background:#0b0f13;border:1px solid var(--line);border-radius:8px;padding:10px;font-size:11px;color:var(--yellow);font-weight:800;max-height:90px;overflow:auto}
   .modal-box .total{margin:16px 0;font-size:14px}
   .modal-box .total strong{color:var(--yellow)}
   .modal-actions{display:flex;gap:10px;margin-top:18px}
@@ -82,8 +105,8 @@
       </div>
     </div>
 
-    <button class="primary-btn" id="btn-participar" style="border:0;cursor:pointer">🏷 QUIERO PARTICIPAR</button>
-    <p class="sold">👤 +<span id="vendidos-hero">1,250</span> boletos vendidos</p>
+    <button class="primary-btn" id="btn-participar" style="border:0;cursor:pointer">🏷 ELEGIR MIS BOLETOS</button>
+    <p class="sold">👤 +<span id="vendidos-hero">0</span> boletos vendidos</p>
   </div>
 
   <div class="tagline">La suerte<br>también<br>se maneja</div>
@@ -113,8 +136,8 @@
       <div class="card-body">
         <h3>FORD F-150 2021</h3>
         <strong>$500 MXN <small>por boleto</small></strong>
-        <div class="progress"><i id="barra-f150" style="width:62%"></i></div>
-        <small><span id="vendidos-card">1,250</span> / <span id="total-card">2,000</span> boletos</small>
+        <div class="progress"><i id="barra-f150" style="width:0%"></i></div>
+        <small><span id="vendidos-card">0</span> / <span id="total-card">2,000</span> boletos</small>
         <p class="mini-count">Termina en:</p>
         <div class="countdown">
           <div><b>12</b><i>DÍAS</i></div>
@@ -183,6 +206,38 @@
   </div>
 </section>
 
+<!-- SELECTOR DE BOLETOS POR NÚMERO -->
+<section class="section" id="elegir-boletos">
+  <div class="section-head">
+    <div><span class="fire">🎟️</span><h2>ELIGE TUS BOLETOS — FORD F-150 2021</h2></div>
+  </div>
+
+  <div class="leyenda">
+    <span><i style="background:#0d1217;border:1px solid var(--line)"></i> Disponible</span>
+    <span><i style="background:var(--yellow)"></i> Seleccionado</span>
+    <span><i style="background:#2b2413"></i> Apartado (alguien está pagando)</span>
+    <span><i style="background:#1c242b"></i> Vendido</span>
+  </div>
+
+  <div class="picker-toolbar">
+    <input type="text" id="buscar-boleto" placeholder="Buscar un número específico, ej. 245">
+    <select id="selector-pagina"></select>
+    <div class="quick-pick">
+      <button type="button" data-n="1">🎲 +1</button>
+      <button type="button" data-n="5">🎲 +5</button>
+      <button type="button" data-n="10">🎲 +10</button>
+    </div>
+  </div>
+
+  <div class="boletos-grid" id="boletos-grid"></div>
+
+  <div class="picker-bar">
+    <span id="picker-count"><b>0</b> boletos seleccionados</span>
+    <span id="picker-total">Total: <b>$0 MXN</b></span>
+    <button type="button" id="btn-comprar-seleccionados" disabled>Comprar seleccionados</button>
+  </div>
+</section>
+
 <!-- CONFIANZA -->
 <div class="trust">
   <div>
@@ -219,14 +274,14 @@
       <div>
         <b>1</b>
         <span>🏷️</span>
-        <h3>Elige tu rifa</h3>
-        <p>Selecciona el premio que más te guste.</p>
+        <h3>Elige tus boletos</h3>
+        <p>Selecciona los números que más te gusten en la cuadrícula.</p>
       </div>
       <div>
         <b>2</b>
         <span>💳</span>
         <h3>Compra tus boletos</h3>
-        <p>Elige la cantidad de boletos y realiza tu pago.</p>
+        <p>Paga de forma segura con Mercado Pago.</p>
       </div>
       <div>
         <b>3</b>
@@ -302,7 +357,10 @@
 <div class="modal-overlay" id="modal">
   <div class="modal-box">
     <h2>Comprar boletos</h2>
-    <p id="modal-rifa-titulo">Ford F-150 2021</p>
+    <p>Ford F-150 2021</p>
+
+    <label>Boletos elegidos</label>
+    <div class="numeros-elegidos" id="modal-numeros">—</div>
 
     <label for="input-nombre">Tu nombre</label>
     <input type="text" id="input-nombre" placeholder="Ej. Juan Pérez">
@@ -310,10 +368,7 @@
     <label for="input-email">Tu correo</label>
     <input type="email" id="input-email" placeholder="tucorreo@ejemplo.com">
 
-    <label for="input-cantidad">Cantidad de boletos</label>
-    <input type="number" id="input-cantidad" value="1" min="1">
-
-    <div class="total">Total a pagar: <strong id="modal-total">$500 MXN</strong></div>
+    <div class="total">Total a pagar: <strong id="modal-total">$0 MXN</strong></div>
     <p class="modal-error" id="modal-error"></p>
 
     <div class="modal-actions">
@@ -324,58 +379,159 @@
 </div>
 
 <script>
-  let precioBoleto = 500;
+  const PAGE_SIZE = 200;
+  let estado = null;
+  let seleccionados = new Set();
+  let paginaActual = 0;
 
-  // Trae los datos reales del servidor (cuántos boletos van vendidos)
   async function cargarEstado() {
     try {
       const r = await fetch('/api/estado');
-      const data = await r.json();
-      precioBoleto = data.precio;
+      estado = await r.json();
 
-      document.getElementById('precio-hero').textContent = data.precio;
-      document.getElementById('vendidos-hero').textContent = data.boletosVendidos.toLocaleString('es-MX');
-      document.getElementById('vendidos-card').textContent = data.boletosVendidos.toLocaleString('es-MX');
-      document.getElementById('total-card').textContent = data.totalBoletos.toLocaleString('es-MX');
+      document.getElementById('precio-hero').textContent = estado.precio;
+      document.getElementById('vendidos-hero').textContent = estado.vendidosNumeros.length.toLocaleString('es-MX');
+      document.getElementById('vendidos-card').textContent = estado.vendidosNumeros.length.toLocaleString('es-MX');
+      document.getElementById('total-card').textContent = estado.totalBoletos.toLocaleString('es-MX');
 
-      const pct = Math.min(100, Math.round((data.boletosVendidos / data.totalBoletos) * 100));
+      const pct = Math.min(100, Math.round((estado.vendidosNumeros.length / estado.totalBoletos) * 100));
       document.getElementById('barra-f150').style.width = pct + '%';
 
-      actualizarTotal();
+      poblarSelectorPagina();
+      renderGrid();
+      actualizarBarra();
     } catch (e) {
       console.log('No se pudo conectar al servidor todavía.', e);
     }
   }
 
+  function poblarSelectorPagina() {
+    const select = document.getElementById('selector-pagina');
+    select.innerHTML = '';
+    const totalPaginas = Math.ceil(estado.totalBoletos / PAGE_SIZE);
+    const digitos = String(estado.totalBoletos).length;
+    for (let p = 0; p < totalPaginas; p++) {
+      const inicio = p * PAGE_SIZE + 1;
+      const fin = Math.min((p + 1) * PAGE_SIZE, estado.totalBoletos);
+      const opt = document.createElement('option');
+      opt.value = p;
+      opt.textContent = `#${String(inicio).padStart(digitos, '0')} – #${String(fin).padStart(digitos, '0')}`;
+      select.appendChild(opt);
+    }
+    select.addEventListener('change', () => {
+      paginaActual = parseInt(select.value, 10);
+      renderGrid();
+    });
+  }
+
+  function renderGrid(resaltarNumero) {
+    const grid = document.getElementById('boletos-grid');
+    grid.innerHTML = '';
+    const inicio = paginaActual * PAGE_SIZE + 1;
+    const fin = Math.min(inicio + PAGE_SIZE - 1, estado.totalBoletos);
+    const digitos = String(estado.totalBoletos).length;
+
+    for (let n = inicio; n <= fin; n++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'boleto';
+      btn.textContent = String(n).padStart(digitos, '0');
+
+      const vendido = estado.vendidosNumeros.includes(n);
+      const reservado = !vendido && estado.reservadosNumeros.includes(n);
+
+      if (vendido) {
+        btn.classList.add('vendido');
+        btn.disabled = true;
+      } else if (reservado) {
+        btn.classList.add('reservado');
+        btn.disabled = true;
+      } else {
+        if (seleccionados.has(n)) btn.classList.add('seleccionado');
+        btn.addEventListener('click', () => toggleSeleccion(n));
+      }
+
+      if (resaltarNumero === n) btn.classList.add('resaltado');
+
+      grid.appendChild(btn);
+    }
+  }
+
+  function toggleSeleccion(n) {
+    if (seleccionados.has(n)) seleccionados.delete(n);
+    else seleccionados.add(n);
+    renderGrid();
+    actualizarBarra();
+  }
+
+  function actualizarBarra() {
+    document.getElementById('picker-count').innerHTML = '<b>' + seleccionados.size + '</b> boletos seleccionados';
+    document.getElementById('picker-total').innerHTML =
+      'Total: <b>$' + (seleccionados.size * estado.precio).toLocaleString('es-MX') + ' MXN</b>';
+    document.getElementById('btn-comprar-seleccionados').disabled = seleccionados.size === 0;
+  }
+
+  document.querySelectorAll('.quick-pick button').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const cuantos = parseInt(btn.dataset.n, 10);
+      const disponibles = [];
+      for (let n = 1; n <= estado.totalBoletos; n++) {
+        if (!estado.vendidosNumeros.includes(n) && !estado.reservadosNumeros.includes(n) && !seleccionados.has(n)) {
+          disponibles.push(n);
+        }
+      }
+      for (let i = 0; i < cuantos && disponibles.length > 0; i++) {
+        const idx = Math.floor(Math.random() * disponibles.length);
+        seleccionados.add(disponibles[idx]);
+        disponibles.splice(idx, 1);
+      }
+      renderGrid();
+      actualizarBarra();
+    });
+  });
+
+  document.getElementById('buscar-boleto').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    const n = parseInt(e.target.value, 10);
+    if (!n || n < 1 || n > estado.totalBoletos) return;
+    paginaActual = Math.floor((n - 1) / PAGE_SIZE);
+    document.getElementById('selector-pagina').value = paginaActual;
+    renderGrid(n);
+    document.getElementById('boletos-grid').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+
+  function irASeleccion() {
+    document.getElementById('elegir-boletos').scrollIntoView({ behavior: 'smooth' });
+  }
+  document.getElementById('btn-participar').addEventListener('click', irASeleccion);
+  document.getElementById('btn-ver-f150').addEventListener('click', irASeleccion);
+
+  // ── Modal ──
   const modal = document.getElementById('modal');
-  const inputCantidad = document.getElementById('input-cantidad');
   const modalError = document.getElementById('modal-error');
 
-  function abrirModal() {
-    modal.classList.add('abierto');
-    modalError.style.display = 'none';
-  }
-  function cerrarModal() {
-    modal.classList.remove('abierto');
-  }
-  function actualizarTotal() {
-    const cantidad = Math.max(1, parseInt(inputCantidad.value || '1', 10));
+  document.getElementById('btn-comprar-seleccionados').addEventListener('click', () => {
+    const digitos = String(estado.totalBoletos).length;
+    const lista = [...seleccionados].sort((a, b) => a - b);
+    document.getElementById('modal-numeros').textContent =
+      lista.map((n) => '#' + String(n).padStart(digitos, '0')).join(', ');
     document.getElementById('modal-total').textContent =
-      '$' + (cantidad * precioBoleto).toLocaleString('es-MX') + ' MXN';
-  }
+      '$' + (lista.length * estado.precio).toLocaleString('es-MX') + ' MXN';
+    modalError.style.display = 'none';
+    modal.classList.add('abierto');
+  });
 
-  document.getElementById('btn-participar').addEventListener('click', abrirModal);
-  document.getElementById('btn-ver-f150').addEventListener('click', abrirModal);
-  document.getElementById('btn-cancelar').addEventListener('click', cerrarModal);
-  inputCantidad.addEventListener('input', actualizarTotal);
+  document.getElementById('btn-cancelar').addEventListener('click', () => {
+    modal.classList.remove('abierto');
+  });
 
   document.getElementById('btn-pagar').addEventListener('click', async () => {
     const nombre = document.getElementById('input-nombre').value.trim();
     const email = document.getElementById('input-email').value.trim();
-    const cantidad = parseInt(inputCantidad.value || '1', 10);
+    const numeros = [...seleccionados];
 
-    if (!nombre || !email || cantidad < 1) {
-      modalError.textContent = 'Por favor completa tu nombre, correo y cantidad de boletos.';
+    if (!nombre || !email || numeros.length === 0) {
+      modalError.textContent = 'Por favor completa tu nombre y correo.';
       modalError.style.display = 'block';
       return;
     }
@@ -385,10 +541,10 @@
     boton.textContent = 'Redirigiendo...';
 
     try {
-      const r = await fetch('/api/crear-preferencia', {
+      const r = await fetch('/api/reservar-boletos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nombre, email, cantidad }),
+        body: JSON.stringify({ nombre, email, numeros }),
       });
       const data = await r.json();
 
@@ -397,6 +553,10 @@
         modalError.style.display = 'block';
         boton.disabled = false;
         boton.textContent = 'Pagar con Mercado Pago';
+        if (data.numerosOcupados) {
+          data.numerosOcupados.forEach((n) => seleccionados.delete(n));
+          await cargarEstado();
+        }
         return;
       }
 

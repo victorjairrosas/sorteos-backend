@@ -1,8 +1,8 @@
 // server.js
 // Este es el programa que corre 24/7 y hace todo el trabajo real:
-// 1) Crea la orden de pago en Mercado Pago cuando alguien quiere comprar boletos.
-// 2) Escucha cuando Mercado Pago confirma que el pago sí se hizo (webhook).
-// 3) Lleva la cuenta de cuántos boletos van vendidos.
+// 1) Muestra qué boletos (por número) están libres, apartados o vendidos.
+// 2) Crea la orden de pago en Mercado Pago para los números que elegiste.
+// 3) Escucha cuando Mercado Pago confirma que el pago sí se hizo (webhook).
 
 require('dotenv').config();
 const express = require('express');
@@ -14,7 +14,7 @@ const db = require('./db');
 const app = express();
 app.use(cors());
 app.use(express.json());
-   app.use(express.static(__dirname)); // sirve index.html, estilos.css, etc.
+app.use(express.static(__dirname)); // sirve index.html, estilos.css, etc.
 
 const PORT = process.env.PORT || 3000;
 const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
@@ -29,35 +29,51 @@ const mpClient = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN || '',
 });
 
-// ── 1) Ver disponibilidad de boletos (para la barra de progreso) ──────────
+// ── 1) Ver el estado de todos los boletos (para pintar la cuadrícula) ─────
 app.get('/api/estado', (req, res) => {
   const rifa = db.getRifaConfig();
   const compras = db.getCompras();
-  const vendidos = db.boletosVendidos(compras);
+  const vendidos = db.numerosVendidos(compras);
+  const ocupados = db.numerosOcupados(compras);
+  // "reservados" = ocupados ahora mismo pero que todavía no están vendidos
+  const reservados = [...ocupados].filter((n) => !vendidos.has(n));
 
   res.json({
     titulo: rifa.titulo,
     precio: rifa.precio,
     totalBoletos: rifa.totalBoletos,
-    boletosVendidos: vendidos,
+    vendidosNumeros: [...vendidos],
+    reservadosNumeros: reservados,
   });
 });
 
-// ── 2) Crear una preferencia de pago (el usuario quiere comprar) ──────────
-app.post('/api/crear-preferencia', async (req, res) => {
+// ── 2) Reservar boletos específicos y crear la orden de pago ──────────────
+app.post('/api/reservar-boletos', async (req, res) => {
   try {
-    const { nombre, email, cantidad } = req.body;
+    const { nombre, email, numeros } = req.body;
 
-    if (!nombre || !email || !cantidad || cantidad < 1) {
-      return res.status(400).json({ error: 'Faltan datos: nombre, email y cantidad son obligatorios.' });
+    if (!nombre || !email || !Array.isArray(numeros) || numeros.length === 0) {
+      return res.status(400).json({ error: 'Faltan datos: nombre, email y al menos un número de boleto.' });
     }
 
     const rifa = db.getRifaConfig();
-    const compras = db.getCompras();
-    const comprometidos = db.boletosComprometidos(compras);
+    const numerosLimpios = [...new Set(numeros.map(Number))].filter(
+      (n) => Number.isInteger(n) && n >= 1 && n <= rifa.totalBoletos
+    );
 
-    if (comprometidos + cantidad > rifa.totalBoletos) {
-      return res.status(409).json({ error: 'Ya no quedan suficientes boletos disponibles.' });
+    if (numerosLimpios.length === 0) {
+      return res.status(400).json({ error: 'Los números de boleto no son válidos.' });
+    }
+
+    const compras = db.getCompras();
+    const ocupados = db.numerosOcupados(compras);
+    const conflicto = numerosLimpios.filter((n) => ocupados.has(n));
+
+    if (conflicto.length > 0) {
+      return res.status(409).json({
+        error: 'Algunos de esos boletos ya no están disponibles.',
+        numerosOcupados: conflicto,
+      });
     }
 
     const compraId = uuidv4();
@@ -65,16 +81,21 @@ app.post('/api/crear-preferencia', async (req, res) => {
       id: compraId,
       nombre,
       email,
-      cantidad: Number(cantidad),
+      numeros: numerosLimpios,
       estado: 'pendiente',
       preferenceId: null,
       paymentId: null,
-      numerosAsignados: [],
       creadoEn: new Date().toISOString(),
     };
 
     compras.push(nuevaCompra);
     db.saveCompras(compras);
+
+    const listaNumeros = numerosLimpios
+      .slice(0, 5)
+      .map((n) => '#' + String(n).padStart(String(rifa.totalBoletos).length, '0'))
+      .join(', ');
+    const extra = numerosLimpios.length > 5 ? ` y ${numerosLimpios.length - 5} más` : '';
 
     const preference = new Preference(mpClient);
     const resultado = await preference.create({
@@ -82,9 +103,9 @@ app.post('/api/crear-preferencia', async (req, res) => {
         items: [
           {
             id: rifa.id,
-            title: `${rifa.titulo} — ${cantidad} boleto(s)`,
-            quantity: 1,
-            unit_price: rifa.precio * Number(cantidad),
+            title: `${rifa.titulo} — boletos ${listaNumeros}${extra}`,
+            quantity: numerosLimpios.length,
+            unit_price: rifa.precio,
             currency_id: 'MXN',
           },
         ],
@@ -100,7 +121,6 @@ app.post('/api/crear-preferencia', async (req, res) => {
       },
     });
 
-    // Guardamos el id de la preferencia por si necesitamos consultarla luego
     const compraActualizada = db.getCompras();
     const idx = compraActualizada.findIndex((c) => c.id === compraId);
     compraActualizada[idx].preferenceId = resultado.id;
@@ -115,8 +135,7 @@ app.post('/api/crear-preferencia', async (req, res) => {
 
 // ── 3) Webhook: Mercado Pago nos avisa aquí si el pago se aprobó ──────────
 app.post('/api/webhook', async (req, res) => {
-  // Respondemos rápido siempre (Mercado Pago solo necesita un 200 OK)
-  res.sendStatus(200);
+  res.sendStatus(200); // Mercado Pago solo necesita un 200 OK rápido
 
   try {
     const paymentId = req.body?.data?.id || req.query['data.id'];
@@ -135,20 +154,12 @@ app.post('/api/webhook', async (req, res) => {
       if (idx === -1) return;
 
       const compra = compras[idx];
-      // Evita procesar el mismo pago dos veces
-      if (compra.estado === 'aprobado') return;
+      if (compra.estado === 'aprobado') return; // ya procesado, no lo dupliques
 
       compra.paymentId = pago.id;
 
       if (pago.status === 'approved') {
-        const rifa = db.getRifaConfig();
-        const vendidosAntes = db.boletosVendidos(compras);
-        const numeros = [];
-        for (let i = 1; i <= compra.cantidad; i++) {
-          numeros.push(vendidosAntes + i);
-        }
         compra.estado = 'aprobado';
-        compra.numerosAsignados = numeros;
       } else if (pago.status === 'rejected') {
         compra.estado = 'rechazado';
       } else {
@@ -162,7 +173,7 @@ app.post('/api/webhook', async (req, res) => {
   }
 });
 
-// ── 4) Consultar el resultado de una compra (para mostrar el número asignado) ──
+// ── 4) Consultar el resultado de una compra ────────────────────────────────
 app.get('/api/compra/:id', (req, res) => {
   const compras = db.getCompras();
   const compra = compras.find((c) => c.id === req.params.id);

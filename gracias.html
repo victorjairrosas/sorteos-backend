@@ -35,7 +35,7 @@
         const data = await r.json();
         if (data.estado === 'aprobado') {
           document.getElementById('numeros').textContent =
-            'Tus boletos: #' + data.numerosAsignados.join(', #');
+            'Tus boletos: #' + data.numeros.join(', #');
         } else {
           document.getElementById('numeros').textContent =
             'Tu pago sigue en proceso, en unos segundos aparecerá confirmado.';

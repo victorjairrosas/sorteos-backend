@@ -1,15 +1,16 @@
 // db.js
 // Esta es nuestra "base de datos" simple: un archivo JSON en disco.
-// Para el tamaño de una rifa (miles de boletos, no millones) esto es
-// perfectamente real y funcional. Más adelante, si el negocio crece,
-// se puede migrar a una base de datos como PostgreSQL sin cambiar
-// mucho el resto del código.
+// Ahora cada compra guarda los NÚMEROS exactos de boleto que se
+// seleccionaron (no solo una cantidad), para poder mostrar una
+// cuadrícula donde la gente elige boletos específicos.
 
 const fs = require('fs');
 const path = require('path');
 
-   const COMPRAS_PATH = path.join(__dirname, 'compras.json');
-   const RIFA_PATH = path.join(__dirname, 'rifa-config.json');
+const COMPRAS_PATH = path.join(__dirname, 'compras.json');
+const RIFA_PATH = path.join(__dirname, 'rifa-config.json');
+
+const RESERVA_MINUTOS = 30; // minutos que "apartamos" un boleto mientras alguien paga
 
 function getRifaConfig() {
   return JSON.parse(fs.readFileSync(RIFA_PATH, 'utf-8'));
@@ -24,26 +25,41 @@ function saveCompras(compras) {
 }
 
 // Cola simple para que dos escrituras nunca se pisen entre sí
-// (por ejemplo, si llegan dos confirmaciones de pago casi al mismo tiempo).
 let cola = Promise.resolve();
 function conCandado(fn) {
   cola = cola.then(fn, fn);
   return cola;
 }
 
-// Boletos ya pagados y confirmados
-function boletosVendidos(compras) {
-  return compras
-    .filter((c) => c.estado === 'aprobado')
-    .reduce((total, c) => total + c.cantidad, 0);
+// Números ya PAGADOS Y CONFIRMADOS
+function numerosVendidos(compras) {
+  const set = new Set();
+  compras.forEach((c) => {
+    if (c.estado === 'aprobado') {
+      (c.numeros || []).forEach((n) => set.add(n));
+    }
+  });
+  return set;
 }
 
-// Boletos vendidos + boletos que alguien está pagando en este momento
-// (los "apartamos" mientras se completa el pago para no vender de más)
-function boletosComprometidos(compras) {
-  return compras
-    .filter((c) => c.estado === 'aprobado' || c.estado === 'pendiente')
-    .reduce((total, c) => total + c.cantidad, 0);
+// Números vendidos + números que alguien está pagando ahora mismo
+// (los "apartamos" temporalmente para que nadie más los elija).
+// Si una compra pendiente ya es muy vieja (se le olvidó pagar), la ignoramos.
+function numerosOcupados(compras) {
+  const ahora = Date.now();
+  const limiteMs = RESERVA_MINUTOS * 60 * 1000;
+  const set = new Set();
+  compras.forEach((c) => {
+    if (c.estado === 'aprobado') {
+      (c.numeros || []).forEach((n) => set.add(n));
+    } else if (c.estado === 'pendiente') {
+      const edad = ahora - new Date(c.creadoEn).getTime();
+      if (edad < limiteMs) {
+        (c.numeros || []).forEach((n) => set.add(n));
+      }
+    }
+  });
+  return set;
 }
 
 module.exports = {
@@ -51,6 +67,6 @@ module.exports = {
   getCompras,
   saveCompras,
   conCandado,
-  boletosVendidos,
-  boletosComprometidos,
+  numerosVendidos,
+  numerosOcupados,
 };
